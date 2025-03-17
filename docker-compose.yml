@@ -18,8 +18,7 @@ services:
       options:
         max-size: "1M"
         max-file: "10"
-
-  
+        
   wp-fpm:
     image: wordpress:6-fpm
     restart: always
@@ -32,7 +31,7 @@ services:
     ports:
       - "9000:9000"
     volumes:
-      - html:/var/www/html
+      - /var/www/ethniclovers:/var/www/html
       - ./conf/php_optional.ini:/usr/local/etc/php/conf.d/php_optional.ini
     env_file:
       - ./conf/wordpress.env
@@ -60,7 +59,7 @@ volumes:
     driver: local
     driver_opts:
       type: none
-      device: $PWD/html 
+      device: /var/www/ethniclovers
       o: bind
   dbdata:
   elastic:
