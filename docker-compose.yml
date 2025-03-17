@@ -19,36 +19,7 @@ services:
         max-size: "1M"
         max-file: "10"
 
-  caddy:
-    build:
-      context: ./caddy
-      dockerfile: Dockerfile
-    restart: always
-    volumes:
-      - ./html:/var/www/html
-      - ./.caddy_data:/data
-      - ./.caddy_config:/config
-      - ./conf/basic_auth.conf:/etc/basic_auth.conf
-      - ./conf/caddyfile_optional.conf:/etc/caddyfile_optional.conf
-      - ./caddy/etc/Caddyfile:/etc/caddy/Caddyfile
-      - ./caddy/etc/tls_auto:/etc/tls_auto
-      - ./caddy/etc/tls_custom:/etc/tls_custom
-      - ./caddy/etc/tls_cloudflare:/etc/tls_cloudflare
-      - ./caddy/etc/tls_selfsigned:/etc/tls_selfsigned
-      - ./mail-acme-challenge:/mail-acme-challenge
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    env_file:
-      - ./conf/caddy.env
-      - ./conf/caddy_sensitive.env
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "1M"
-        max-file: "10"
-
+  
   wp-fpm:
     image: wordpress:6-fpm
     restart: always
@@ -58,6 +29,8 @@ services:
     depends_on:
       - db
       - redis
+    ports:
+      - "9000:9000"
     volumes:
       - html:/var/www/html
       - ./conf/php_optional.ini:/usr/local/etc/php/conf.d/php_optional.ini
