@@ -43,6 +43,30 @@ services:
         max-size: "1M"
         max-file: "10"
 
+  wp-fpm-site2:
+    image: wordpress:6-fpm
+    restart: always
+    links:
+      - db
+      - redis
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "9001:9000"
+    volumes:
+      - type: bind
+        source: /var/www/site2
+        target: /var/www/html
+      - ./conf/php_optional.ini:/usr/local/etc/php/conf.d/php_optional.ini
+    env_file:
+      - ./conf/wordpress-site2.env
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1M"
+        max-file: "10"
+
   db:
     image: mariadb:11-jammy
     restart: always
