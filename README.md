@@ -184,3 +184,122 @@ Backup the `html` directory for file backup.
 Run the `db_backup.sh` script. The script makes a proper innodb backup and stores the file in the `backups` directory.
 
 Note: the `db_restore.sh` is to be rewritten with innodb backups. If you need to run a restore, [do it manually](https://mariadb.com/kb/en/full-backup-and-restore-with-mariabackup/).
+
+## Adding Multiple WordPress Sites
+
+This setup supports running multiple WordPress sites using the same infrastructure (Redis, MariaDB, etc.). Here's how to add another WordPress site:
+
+1. Create a new environment file for the second site:
+```bash
+cp ./conf/wordpress.env ./conf/wordpress-site2.env
+```
+
+2. Edit `wordpress-site2.env` with unique values:
+```env
+WORDPRESS_DB_USER=wordpress
+WORDPRESS_DB_PASSWORD=your_password
+WORDPRESS_DB_NAME=wordpress_site2
+WORDPRESS_DB_HOST=db:3306
+WORDPRESS_TABLE_PREFIX=wp2_
+```
+
+3. Create a directory for the new site:
+```bash
+sudo mkdir -p /var/www/site2
+sudo chown -R www-data:www-data /var/www/site2
+```
+
+4. Add a new WordPress service to `docker-compose.yml`:
+```yaml
+  wp-fpm-site2:
+    image: wordpress:6-fpm
+    restart: always
+    links:
+      - db
+      - redis
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "9001:9000"
+    volumes:
+      - type: bind
+        source: /var/www/site2
+        target: /var/www/html
+      - ./conf/php_optional.ini:/usr/local/etc/php/conf.d/php_optional.ini
+    env_file:
+      - ./conf/wordpress-site2.env
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1M"
+        max-file: "10"
+```
+
+5. Create the new database:
+```bash
+# Connect to MariaDB
+docker-compose exec db mysql -u root -p
+
+# Inside MariaDB, create new database and grant permissions
+CREATE DATABASE wordpress_site2;
+GRANT ALL PRIVILEGES ON wordpress_site2.* TO 'wordpress'@'%';
+FLUSH PRIVILEGES;
+```
+
+6. Add a new virtual host to your Caddyfile:
+```caddyfile
+site2.com {
+    tls abhijit@utplco.com
+    root * /var/www/site2
+
+    handle {
+        try_files {path} {path}/ /index.php?{query}
+    }
+
+    php_fastcgi localhost:9001 {
+        root /var/www/html
+        split .php
+        index index.php
+    }
+
+    file_server
+
+    # Same headers and logging as your first site
+    header {
+        Content-Security-Policy "upgrade-insecure-requests; default-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data: https:; font-src 'self' data: https:; object-src 'none'"
+        # ... other headers ...
+    }
+
+    log {
+        output file /var/log/caddy/site2.log
+        format console
+    }
+}
+```
+
+7. Apply the changes:
+```bash
+docker-compose down
+docker-compose up -d
+sudo systemctl reload caddy
+```
+
+8. Configure Redis for the new site:
+```bash
+docker-compose exec wp-fpm-site2 wp --allow-root config set WP_REDIS_HOST redis
+```
+
+9. Configure Elasticsearch for the new site:
+- Install and activate Elasticpress plugin
+- Set Elasticsearch Host URL to `http://elastic:9200`
+- Configure features as described in the Elasticsearch section above
+
+Each WordPress site will:
+- Have its own PHP-FPM process
+- Use the same MariaDB server but different databases
+- Share the Redis instance (but use different prefixes)
+- Have its own domain and configuration
+- Share the same Elasticsearch instance
+
+To add more sites, repeat these steps with new names and ports.
